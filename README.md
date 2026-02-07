@@ -132,6 +132,123 @@ Developers can extend FlexiRule by creating **Standard Processes**:
 
 ---
 
+## 🧩 ERPNext DocType Rule Examples
+
+Below are end-to-end examples showing how a **Rule** (entry point), **Conditions**, and **Actions** can be wired together for common ERPNext DocTypes.
+
+### 1) Sales Invoice — enforce credit limit before submit
+
+**Rule**
+- **DocType:** `Sales Invoice`
+- **Event:** `Before Submit`
+- **Roles:** `Accounts Manager`
+
+**Condition Tree**
+- `doc.customer` **is set**
+- `doc.outstanding_amount + doc.grand_total` **>** `doc.customer_credit_limit`
+
+**Actions (Graph)**
+1. **Fetch Customer Credit Limit** (Process Operation)
+   - Inputs: `customer = doc.customer`
+   - Output: `customer_credit_limit`
+2. **Raise Error**
+   - Message: `Customer {{ doc.customer }} exceeds credit limit.`
+   - Halt execution.
+
+**Result**
+- Sales Invoice cannot be submitted when it pushes the customer above their credit limit.
+
+---
+
+### 2) Purchase Order — auto-assign approver for high value
+
+**Rule**
+- **DocType:** `Purchase Order`
+- **Event:** `Before Save`
+- **Roles:** `Purchase User`
+
+**Condition Tree**
+- `doc.grand_total` **>=** `100000`
+
+**Actions (Graph)**
+1. **Set Value**
+   - Field: `approver`
+   - Value: `procurement.head@company.com`
+2. **Notify**
+   - Channel: Email
+   - Message: `High value PO {{ doc.name }} assigned for approval.`
+
+**Result**
+- Large POs are routed to the correct approver automatically.
+
+---
+
+### 3) Stock Entry — block negative stock in warehouse
+
+**Rule**
+- **DocType:** `Stock Entry`
+- **Event:** `Before Submit`
+- **Roles:** `Stock Manager`
+
+**Condition Tree**
+- `doc.stock_entry_type` **=** `Material Transfer`
+- **Any** item row where:
+  - `item.qty` **>** `item.actual_qty`
+
+**Actions (Graph)**
+1. **Raise Error**
+   - Message: `Negative stock not allowed in {{ item.s_warehouse }} for {{ item.item_code }}.`
+
+**Result**
+- Prevents stock transfers that would drive a warehouse negative.
+
+---
+
+### 4) Leave Application — auto-approve for small casual leave
+
+**Rule**
+- **DocType:** `Leave Application`
+- **Event:** `Before Save`
+- **Roles:** `HR User`
+
+**Condition Tree**
+- `doc.leave_type` **=** `Casual Leave`
+- `doc.total_leave_days` **<=** `2`
+
+**Actions (Graph)**
+1. **Set Value**
+   - Field: `status`
+   - Value: `Approved`
+2. **Notify**
+   - Channel: Email
+   - Message: `Leave {{ doc.name }} auto-approved for {{ doc.employee_name }}.`
+
+**Result**
+- Short casual leaves can be auto-approved without manual intervention.
+
+---
+
+### 5) Sales Order — ensure delivery date is set for stock items
+
+**Rule**
+- **DocType:** `Sales Order`
+- **Event:** `Before Save`
+- **Roles:** `Sales User`
+
+**Condition Tree**
+- **Any** item row where:
+  - `item.is_stock_item` **=** `1`
+  - `item.delivery_date` **is not set**
+
+**Actions (Graph)**
+1. **Raise Error**
+   - Message: `Delivery Date is required for stock item {{ item.item_code }}.`
+
+**Result**
+- Ensures stock items always have a delivery date before saving.
+
+---
+
 ## 🤝 Contributing
 
 <details>
